@@ -24,14 +24,31 @@ ENDM
     MSG_PROGRAMA_FINALIZADO DB "!PROGRAMA FINALIZADO CON EXITO! ", '$'
     MSG_JUGAR DB "JUGAR ", '$'
     MSG_CARGAR DB "CARGAR PARTIDA ", '$'
+    MSG_GUARDAR DB "GUARDAR PARTIDA ", '$'
+    MSG_REINICIAR DB "REINICIAR PARTIDA ", '$'
+    MSG_SALIR DB "SALIR PARTIDA ", '$'
+
+    MSG_INSTRUCCIONES_COLOR DB "SELECCIONE EL COLOR DE LOS JUGADORES PARA INICIAR ", '$'
+    MSG_COLOR1 DB "COLOR JUGADOR 1: 1 = ROJO , 2 = AMARILLO , 3 = BLANCO ", '$'
+    MSG_COLOR2 DB "COLOR JUGADOR 2: 4 = ROSADO , 5 = AZUL , 6 = VERDE ", '$'
+   
+    MSG_GANADOR1 DB "HA GANADO EL JUGADOR 1 ", '$'
+    MSG_GANADOR2 DB "HA GANADO EL JUGADOR 2", '$'
+    MSG_EMPATE DB "HA SIDO UN EMPATE ", '$'
+
+    MSG_PUNTOS_JUG1 DB "PUNTOS JUGADOR 1: ", '$'
+    MSG_PUNTOS_JUG2 DB "PUNTOS JUGADOR 2: ", '$'
+
     ISCLICK DB 0
     NAMEPAR LABEL BYTE
     MAXNLEN DB 20
     NAMELEN DB ?
     NAMEFLD1 DB 21 DUP(' ')
     PROMPT1 DB 'Jugador 1: ', '$'
-    NAMEFLD2 DB 21 DUP(' ')
+    NAMEJUGA1 DB 21 DUP(' ')
+    NAMEJUGA2 DB 21 DUP(' ')
     PROMPT2 DB 'Jugador 2: ', '$'
+
     POSX DW 15
     POSY DW 15
     COLOR_PIXEL DB 01H
@@ -49,22 +66,49 @@ ENDM
 
     CLICK_JUGAR DB 0
     CLICK_CARGAR DB 0
+    CLICK_GUARDAR DB 0
+    CLICK_REINICIAR DB 0
+    CLICK_SALIR DB 0
 
     COLOR_LIMITE_ARRIBA DW 0  ; LIMITE DE ARRIBA PARA EL RELLENO
     COLOR_LIMITE_ABAJO DW 0 ; LIMITE DE ABAJO PARA EL RELLENO
 
+    COLOR1_SELECCIONADO DB 0
+    COLOR2_SELECCIONADO DB 0
+
+    TURNO_JUGADOR DW 0
+    PUNTOS_JUGADOR1 DW 10
+    PUNTOS_JUGADOR2 DW 0
+
+    FIN_PARTIDA DB 0
     ;PARA SABER QUÉ CUADROS ESTÁN PINTADOS
     SUPERIOR_IZQUIERDA_PINTADO DB 0
+    LADO_IZQUIERDO_PINTADO DB 0
+    INFERIOR_IZQUIERDA_PINTADO DB 0
+
+    LADO_SUPERIOR_PINTADO DB 0
+    CENTRAL_PINTADO DB 0
+    LADO_INFERIOR_PINTADO DB 0
+
+    SUPERIOR_DERECHA_PINTADO DB 0
+    LADO_DERECHO_PINTADO DB 0
+    INFERIOR_DERECHA_PINTADO DB 0
+
+    CUADROS_PINTADOS DB 0
+    GANADOR DB 0
 ;-------------
-    COLORES_DIBUJADOS DW 0   ; CANTIDAD DE COLORES DIBUJADOS
     ; PALETA DE COLORES
-    CL_ROSADO DB 0DH
+    CL_ROSADO DB 0DH;
     CL_AZUL DB 01H
     CL_VERDE DB 0AH
-    CL_ROJO DB 04H
+    CL_ROJO DB 04H ;
     CL_MARRON DB 0CH
-    CL_AMARILLO DB 0EH
-    CL_BLANCO DB 0FH
+    CL_AMARILLO DB 0EH;
+    CL_BLANCO DB 0FH;
+
+    COLOR_JUGADOR1 DB 04H
+    COLOR_JUGADOR2 DB 01H
+    COLOR_RELLENO DB 0AH
 ;------------------
 ;------------------------
 ; FINAL SEGMENTO DE DATOS
@@ -79,78 +123,31 @@ MAIN PROC FAR
     MOV AX, @DATA
     MOV DS, AX
 
-    CALL LIMPIAR_PANTALLA
-    
-    ;MOSTRAR CURSOR
-    MOV AX, 01H
-    INT 33H
+    INICIO:
+        CALL LIMPIAR_PANTALLA
+        
+        ;MOSTRAR CURSOR
+        MOV AX, 01H
+        INT 33H
 
-    CALL MENU_INICIAL
+        CALL MENU_INICIAL
 
-    CALL RESTAURA_MOUSE
+        CALL RESTAURA_MOUSE
 
-    CALL OBTENER_NOMBRE
+        CALL DETECTAR_TECLAS
 
-    CALL DIBUJAR_GUI
+        CALL OBTENER_NOMBRE
 
-    CALL DETECTAR_CLICK
-    
-    CALL CICLO_SISTEMA
+        CALL DIBUJAR_GUI
 
-    CALL TERMINAR_PROGRAMA
+        CALL DETECTAR_CLICK
+        
+        CMP CLICK_SALIR, 1
+        JE INICIO
+
+        CALL TERMINAR_PROGRAMA
     
 MAIN ENDP
-
-Q20CURS PROC NEAR
-    MOV AH, 02H
-    MOV BH, 00
-    INT 10H
-    
-    RET
- Q20CURS ENDP   
-
-R10PRMP1 PROC NEAR
-    MOV AH,09H
-    LEA DX,PROMPT1
-    INT 21H
-    RET 
-R10PRMP1 ENDP
-
-R10PRMP2 PROC NEAR
-    MOV AH,09H
-    LEA DX,PROMPT2
-    INT 21H
-    RET 
-R10PRMP2 ENDP
-
-D10INPT PROC NEAR
-    MOV AH,0AH
-    LEA DX,NAMEPAR
-    INT 21H
-    RET 
-D10INPT ENDP
-
-OBTENER_NOMBRE PROC NEAR
-
-    POS_CURSOR 1,3
-
-    CALL Q20CURS
-
-    CALL R10PRMP1
-
-    CALL D10INPT
-
-    POS_CURSOR 1,53
-
-    CALL Q20CURS
-
-    CALL R10PRMP2
-
-    CALL D10INPT
-
-    RET
-
-OBTENER_NOMBRE ENDP
 
 RESTAURA_MOUSE PROC
 	;RESTAURA ESTADO DEL MOUSE 
@@ -193,11 +190,27 @@ CICLO_SISTEMA PROC
 CICLO_SISTEMA ENDP
 
 DETECTAR_CLICK PROC
-    MOV AX, 03H                 ; PARA DETECTAR CUANDO SE SUELTA EL CLICK
-    INT 33h                     ; SE LLAMA LA INTERRUPCION DEL MOUSE     
-    CMP BX, 1                   ; LA INTERRUPCION DEVUELVE EN BX LA CANTIDAD DE VECES QUE SE SOLTO, ENTONCES COMPARO CON 1
-    JNL COMPARAR_COORDENADAS    ; SI SE PRESIONO AL MENOS UNA VEZ, SALTA A CLICK_IZQUIERDO
-    JNE DETECTAR_CLICK
+
+    CALL BUSCAR_GANADOR
+    CMP GANADOR, 1
+    JE FINISH
+    JNE INI_CLICK   
+    CMP CUADROS_PINTADOS, 9
+    JE FINISH
+    JNE INI_CLICK   
+
+    FINISH:
+        CALL DETERMINA_GANADOR
+        MOV FIN_PARTIDA,1
+
+    INI_CLICK:
+        MOV AX, 03H                 ; PARA DETECTAR CUANDO SE SUELTA EL CLICK
+        INT 33h                     ; SE LLAMA LA INTERRUPCION DEL MOUSE                       
+        CMP BX, 1                   ; LA INTERRUPCION DEVUELVE EN BX LA CANTIDAD DE VECES QUE SE SOLTO, ENTONCES COMPARO CON 1                   
+        JNL COMPARAR_COORDENADAS    ; SI SE PRESIONO AL MENOS UNA VEZ, SALTA A CLICK_IZQUIERDO
+        CMP GANADOR, 1
+        JE INI_CLICK
+        JNE DETECTAR_CLICK
 
     COMPARAR_COORDENADAS:
 
@@ -213,62 +226,181 @@ DETECTAR_CLICK PROC
         CALL COORDENADAS_LADO_INFERIOR
         CALL COORDENADAS_CENTRO
 
-        CMP CLICK_SUPERIOR_IZQUIERDA, 1
-        JE CLICK_EN_SUPERIOR_IZQUIERDA 
-        CMP CLICK_LADO_IZQUIERDO, 1
-        JE CLICK_EN_LADO_IZQUIERDO
-        CMP CLICK_INFERIOR_IZQUIERDA, 1
-        JE CLICK_EN_INFERIOR_IZQUIERDA
-        JE CLICK_EN_LADO_IZQUIERDO
+        CALL COORDENADAS_GUARDAR
+        CALL COORDENADAS_REINICIAR
+        CALL COORDENADAS_SALIR
 
-        CMP CLICK_SUPERIOR_DERECHA, 1
-        JE CLICK_EN_SUPERIOR_DERECHA
-        CMP CLICK_LADO_DERECHO, 1
-        JE CLICK_EN_LADO_DERECHO
-        CMP CLICK_INFERIOR_DERECHA, 1
-        JE CLICK_EN_INFERIOR_DERECHA
+        JMP SIG1
+        
+        DETECTAR_CLICK_AUX0:
+            JMP INI_CLICK 
 
-        CMP CLICK_LADO_SUPERIOR, 1
-        JE CLICK_EN_LADO_SUPERIOR
-        CMP CLICK_LADO_INFERIOR, 1
-        JE CLICK_EN_LADO_INFERIOR
-        CMP CLICK_CENTRO, 1
-        JE CLICK_EN_CENTRO
+        SIG1:
+            CMP CLICK_SUPERIOR_IZQUIERDA, 1
+            JNE SIG2
+            CLICK_EN_SUPERIOR_IZQUIERDA:
+                CMP SUPERIOR_IZQUIERDA_PINTADO, 1
+                JE DETECTAR_CLICK_AUX0
+                CMP SUPERIOR_IZQUIERDA_PINTADO, 2
+                JE DETECTAR_CLICK_AUX0
+                MOV AX, 02H
+                INT 33H
+                CALL RELLENEAR_CUADRO_SUPERIOR_IZQUIERDA
+                INC CUADROS_PINTADOS
+                MOV AX, 01H
+                INT 33H
+                JMP DETECTAR_CLICK_AUX0  
+        SIG2:
+            CMP CLICK_LADO_IZQUIERDO, 1
+            JNE SIG3
+            CLICK_EN_LADO_IZQUIERDO:
+                CMP LADO_IZQUIERDO_PINTADO, 1
+                JE DETECTAR_CLICK_AUX0
+                CMP LADO_IZQUIERDO_PINTADO, 2
+                JE DETECTAR_CLICK_AUX0
+                MOV AX, 02H
+                INT 33H
+                CALL RELLENEAR_CUADRO_LADO_IZQUIERDO
+                INC CUADROS_PINTADOS
+                MOV AX, 01H
+                INT 33H
+                JMP DETECTAR_CLICK_AUX0 
+        SIG3:
+            CMP CLICK_INFERIOR_IZQUIERDA, 1
+            JNE SIG4
+            CLICK_EN_INFERIOR_IZQUIERDA:
+                CMP INFERIOR_IZQUIERDA_PINTADO, 1
+                JE DETECTAR_CLICK_AUX0
+                CMP INFERIOR_IZQUIERDA_PINTADO, 2
+                JE DETECTAR_CLICK_AUX0
+                MOV AX, 02H
+                INT 33H
+                CALL RELLENEAR_CUADRO_INFERIOR_IZQUIERDO
+                INC CUADROS_PINTADOS
+                MOV AX, 01H
+                INT 33H
+                JMP DETECTAR_CLICK_AUX0
 
-        JMP DETECTAR_CLICK
+        DETECTAR_CLICK_AUX1:
+            JMP DETECTAR_CLICK_AUX0
 
-    CLICK_EN_SUPERIOR_IZQUIERDA:
-        MOV AX, 02H
-        INT 33H
-        CALL RELLENEAR_CUADRO ;<----------------------------------------------------
-        MOV AX, 01H
-        INT 33H
-        JMP DETECTAR_CLICK    
-    CLICK_EN_LADO_IZQUIERDO:
-        ;CALL TERMINAR_PROGRAMA
-        JMP DETECTAR_CLICK 
-    CLICK_EN_INFERIOR_IZQUIERDA:
-        ;CALL TERMINAR_PROGRAMA
-        JMP DETECTAR_CLICK 
-    CLICK_EN_SUPERIOR_DERECHA:
-        ;CALL TERMINAR_PROGRAMA
-        JMP DETECTAR_CLICK 
-    CLICK_EN_LADO_DERECHO:
-        ;CALL TERMINAR_PROGRAMA
-        JMP DETECTAR_CLICK 
-    CLICK_EN_INFERIOR_DERECHA:
-        ;CALL TERMINAR_PROGRAMA
-        JMP DETECTAR_CLICK 
-    CLICK_EN_LADO_SUPERIOR:
-        ;CALL TERMINAR_PROGRAMA
-        JMP DETECTAR_CLICK 
-    CLICK_EN_LADO_INFERIOR:
-        ;CALL TERMINAR_PROGRAMA
-        JMP DETECTAR_CLICK 
-    CLICK_EN_CENTRO:
-        CALL TERMINAR_PROGRAMA
-        JMP DETECTAR_CLICK            
-               
+        SIG4:
+            CMP CLICK_SUPERIOR_DERECHA, 1
+            JNE SIG5
+            CLICK_EN_SUPERIOR_DERECHA:
+                CMP SUPERIOR_DERECHA_PINTADO, 1
+                JE DETECTAR_CLICK_AUX1
+                CMP SUPERIOR_DERECHA_PINTADO, 2
+                JE DETECTAR_CLICK_AUX1
+                MOV AX, 02H
+                INT 33H
+                CALL RELLENEAR_CUADRO_SUPERIOR_DERECHA
+                INC CUADROS_PINTADOS
+                MOV AX, 01H
+                INT 33H
+                JMP DETECTAR_CLICK_AUX1  
+        SIG5:    
+            CMP CLICK_LADO_DERECHO, 1
+            JNE SIG6
+            CLICK_EN_LADO_DERECHO:
+                CMP LADO_DERECHO_PINTADO, 1
+                JE DETECTAR_CLICK_AUX1
+                CMP LADO_DERECHO_PINTADO, 2
+                JE DETECTAR_CLICK_AUX1
+                MOV AX, 02H
+                INT 33H
+                CALL RELLENEAR_CUADRO_LADO_DERECHO
+                INC CUADROS_PINTADOS
+                MOV AX, 01H
+                INT 33H
+                JMP DETECTAR_CLICK_AUX1     
+
+        SIG6:
+            CMP CLICK_INFERIOR_DERECHA, 1
+            JNE SIG7
+            CLICK_EN_INFERIOR_DERECHA:
+                CMP INFERIOR_DERECHA_PINTADO, 1
+                JE DETECTAR_CLICK_AUX1
+                CMP INFERIOR_DERECHA_PINTADO, 2
+                JE DETECTAR_CLICK_AUX1
+                MOV AX, 02H
+                INT 33H
+                CALL RELLENEAR_CUADRO_INFERIOR_DERECHA
+                INC CUADROS_PINTADOS
+                MOV AX, 01H
+                INT 33H
+                JMP DETECTAR_CLICK_AUX1  
+
+        DETECTAR_CLICK_AUX2:
+            JMP DETECTAR_CLICK_AUX1     
+
+        SIG7:
+            CMP CLICK_LADO_SUPERIOR, 1
+            JNE SIG8
+            CLICK_EN_LADO_SUPERIOR:
+                CMP LADO_SUPERIOR_PINTADO, 1
+                JE DETECTAR_CLICK_AUX2
+                CMP LADO_SUPERIOR_PINTADO, 2
+                JE DETECTAR_CLICK_AUX2
+                MOV AX, 02H
+                INT 33H
+                CALL RELLENEAR_CUADRO_LADO_SUPERIOR
+                INC CUADROS_PINTADOS
+                MOV AX, 01H
+                INT 33H
+                JMP DETECTAR_CLICK_AUX2
+
+        SIG8:
+            CMP CLICK_LADO_INFERIOR, 1
+            JNE SIG9
+            CLICK_EN_LADO_INFERIOR:
+                CMP LADO_INFERIOR_PINTADO, 1
+                JE DETECTAR_CLICK_AUX2
+                CMP LADO_INFERIOR_PINTADO, 2
+                JE DETECTAR_CLICK_AUX2
+                MOV AX, 02H
+                INT 33H
+                CALL RELLENEAR_CUADRO_LADO_INFERIOR
+                INC CUADROS_PINTADOS
+                MOV AX, 01H
+                INT 33H
+                JMP DETECTAR_CLICK_AUX2     
+        SIG9:
+            CMP CLICK_CENTRO, 1
+            JNE SIG10  
+            CLICK_EN_CENTRO:
+                CMP CENTRAL_PINTADO, 1
+                JE DETECTAR_CLICK_AUX2
+                CMP CENTRAL_PINTADO, 2
+                JE DETECTAR_CLICK_AUX2
+                MOV AX, 02H
+                INT 33H
+                CALL RELLENEAR_CUADRO_CENTRAL
+                INC CUADROS_PINTADOS
+                MOV AX, 01H
+                INT 33H
+                JMP DETECTAR_CLICK_AUX2
+
+        DETECTAR_CLICK_AUX3:
+            JMP DETECTAR_CLICK_AUX2
+
+        SIG10:
+            CMP CLICK_GUARDAR, 1
+            JNE SIG11
+            CLICK_EN_GUARDAR:
+                ;CALL TERMINAR_PROGRAMA    
+                JMP DETECTAR_CLICK_AUX3
+        SIG11:
+            CMP CLICK_REINICIAR, 1
+            JNE SIG12
+            CLICK_EN_REINICIAR:
+                CALL REINICIA_JUEGO
+                JMP DETECTAR_CLICK_AUX3
+        SIG12:
+            CMP CLICK_SALIR, 1
+            JNE DETECTAR_CLICK_AUX3
+            CLICK_EN_SALIR:  
+            RET
 DETECTAR_CLICK ENDP
 
 COORDENADAS_SUPERIOR_IZQUIERDA PROC
@@ -390,7 +522,7 @@ COORDENADAS_LADO_SUPERIOR PROC
         RET
 COORDENADAS_LADO_SUPERIOR ENDP
 
-COORDENADAS_LADO_INFERIOR PROC
+COORDENADAS_LADO_INFERIOR PROC ;C
     MOV CLICK_LADO_INFERIOR, 1
     CMP CX, 219
     JL SALIR_LAD_INF
@@ -398,7 +530,7 @@ COORDENADAS_LADO_INFERIOR PROC
     JG SALIR_LAD_INF
     CMP DX, 207
     JL SALIR_LAD_INF
-    CMP DX, 331
+    CMP DX, 291
     JG SALIR_LAD_INF
     RET
 
@@ -407,7 +539,7 @@ COORDENADAS_LADO_INFERIOR PROC
         RET
 COORDENADAS_LADO_INFERIOR ENDP
 
-COORDENADAS_CENTRO PROC
+COORDENADAS_CENTRO PROC ; C
     MOV CLICK_CENTRO, 1
     CMP CX, 219
     JL SALIR_CENTRO
@@ -415,7 +547,7 @@ COORDENADAS_CENTRO PROC
     JG SALIR_CENTRO
     CMP DX, 123
     JL SALIR_CENTRO
-    CMP DX, 292
+    CMP DX, 207
     JG SALIR_CENTRO
     RET
 
@@ -424,9 +556,73 @@ COORDENADAS_CENTRO PROC
         RET
 COORDENADAS_CENTRO ENDP
 
+COORDENADAS_GUARDAR PROC ; C
+    MOV CLICK_GUARDAR, 1
+    CMP CX, 23 
+    JL SALIR_GUARDAR
+    CMP CX, 217
+    JG SALIR_GUARDAR
+    CMP DX, 314 
+    JL SALIR_GUARDAR
+    CMP DX, 341 
+    JG SALIR_GUARDAR
+    RET
+
+    SALIR_GUARDAR:
+        MOV CLICK_GUARDAR, 0
+        RET
+COORDENADAS_GUARDAR ENDP
+
+COORDENADAS_REINICIAR PROC ; C
+    MOV CLICK_REINICIAR, 1
+    CMP CX, 223 ;3
+    JL SALIR_REINICIAR
+    CMP CX, 415;1
+    JG SALIR_REINICIAR
+    CMP DX, 314 ;4
+    JL SALIR_REINICIAR
+    CMP DX, 341 ;2
+    JG SALIR_REINICIAR
+    RET
+    SALIR_REINICIAR:
+        MOV CLICK_REINICIAR, 0
+        RET
+COORDENADAS_REINICIAR ENDP
+
+COORDENADAS_SALIR PROC ; C
+    MOV CLICK_SALIR, 1
+    CMP CX, 423 ;3
+    JL SALIR_SALIR
+    CMP CX, 615;1
+    JG SALIR_SALIR
+    CMP DX, 314 ;4
+    JL SALIR_SALIR
+    CMP DX, 341 ;2
+    JG SALIR_SALIR
+    RET
+    SALIR_SALIR:
+        MOV CLICK_SALIR, 0
+        RET
+COORDENADAS_SALIR ENDP
+
 DIBUJAR_GUI PROC
+    MOV AX, 02H
+    INT 33H
+
+    POS_CURSOR 23,7 
+    MOV AH, 09H
+	LEA DX, MSG_GUARDAR
+	INT 21H
+    POS_CURSOR 23,32
+    MOV AH, 09H
+	LEA DX, MSG_REINICIAR
+	INT 21H
+    POS_CURSOR 23,59 
+    MOV AH, 09H
+	LEA DX, MSG_SALIR
+	INT 21H
+
     MOV COLOR_PIXEL, 07H
-    
     MOV POSX, 20
     MOV POSY, 40
     JMP ESQUINA_SUPERIOR_IZQUIERDA_1
@@ -455,7 +651,7 @@ DIBUJAR_GUI PROC
         CALL PRINT_PIXEL
         DEC POSY
         JMP ESQUINA_SUPERIOR_IZQUIERDA_4
-;------------------------------------------        
+    ;------------------------------------------        
         LADO_IZQUIERDO:
         MOV POSX, 20
         MOV POSY, 124
@@ -485,7 +681,7 @@ DIBUJAR_GUI PROC
         CALL PRINT_PIXEL
         DEC POSY
         JMP LADO_IZQUIERDO_4
-;------------------------------------------
+    ;------------------------------------------
     ESQUINA_INFERIOR_IZQUIERDA:
         MOV POSX, 20
         MOV POSY, 208
@@ -515,7 +711,7 @@ DIBUJAR_GUI PROC
         CALL PRINT_PIXEL
         DEC POSY
         JMP ESQUINA_INFERIOR_IZQUIERDA_4
-;------------------------------------------
+    ;------------------------------------------
     ESQUINA_INFERIOR_DERECHA:
         MOV POSX, 420
         MOV POSY, 208
@@ -545,7 +741,7 @@ DIBUJAR_GUI PROC
         CALL PRINT_PIXEL
         DEC POSY
         JMP ESQUINA_INFERIOR_DERECHA_4
-;------------------------------------------
+    ;------------------------------------------
     ESQUINA_SUPERIOR_DERECHA:
         MOV POSX, 420
         MOV POSY, 40
@@ -575,7 +771,7 @@ DIBUJAR_GUI PROC
         CALL PRINT_PIXEL
         DEC POSY
         JMP ESQUINA_SUPERIOR_DERECHA_4
-;------------------------------------------
+    ;------------------------------------------
     LADO_DERECHO:
         MOV POSX, 420
         MOV POSY, 124
@@ -600,12 +796,12 @@ DIBUJAR_GUI PROC
         DEC POSX
         JMP LADO_DERECHO_3
     LADO_DERECHO_4:
-        CMP POSY, 104
+        CMP POSY, 124
         JE  LADO_SUPERIOR
         CALL PRINT_PIXEL
         DEC POSY
         JMP LADO_DERECHO_4
-;------------------------------------------
+    ;------------------------------------------
     LADO_SUPERIOR:
         MOV POSX, 220
         MOV POSY, 40
@@ -661,81 +857,1156 @@ DIBUJAR_GUI PROC
         JMP LADO_INFERIOR_3
     LADO_INFERIOR_4:
         CMP POSY, 208
-        JE TERMINAR
+        JE BTNS_GAME
         CALL PRINT_PIXEL
         DEC POSY
         JMP LADO_INFERIOR_4
+    ;------------------------------------------
+    BTNS_GAME:
+        CALL DIBUJAR_BTNS_GAME
+    
     TERMINAR:
-        
+        MOV AX, 01H
+        INT 33H
         MOV COLOR_PIXEL, 01H
         RET
 DIBUJAR_GUI ENDP
 
-RELLENEAR_CUADRO PROC
-    DIBUJAR_COLORES_DISPONIBLES:
+DIBUJAR_BTNS_GAME PROC ; DIBUJO LOS BOTONES DEL TABLERO
+    BTN_GUARDAR:
+        MOV POSX, 24
+        MOV POSY, 315
+        JMP BTN_GUARDAR_1
+
+    BTN_GUARDAR_1:
+        CMP POSX, 216
+        JE BTN_GUARDAR_2
+        CALL PRINT_PIXEL
+        INC POSX
+        JMP BTN_GUARDAR_1
+    BTN_GUARDAR_2:
+        CMP POSY, 342
+        JE BTN_GUARDAR_3
+        CALL PRINT_PIXEL
+        INC POSY
+        JMP BTN_GUARDAR_2
+    BTN_GUARDAR_3:
+        CMP POSX, 24
+        JE BTN_GUARDAR_4
+        CALL PRINT_PIXEL
+        DEC POSX
+        JMP BTN_GUARDAR_3
+    BTN_GUARDAR_4:
+        CMP POSY, 315
+        JE BTN_REINICIAR
+        CALL PRINT_PIXEL
+        DEC POSY
+        JMP BTN_GUARDAR_4
+    ;------------------------------------------
+    BTN_REINICIAR:
+        MOV POSX, 224
+        MOV POSY, 315
+        JMP BTN_REINICIAR_1
+
+    BTN_REINICIAR_1:
+        CMP POSX, 416
+        JE BTN_REINICIAR_2
+        CALL PRINT_PIXEL
+        INC POSX
+        JMP BTN_REINICIAR_1
+    BTN_REINICIAR_2:
+        CMP POSY, 342
+        JE BTN_REINICIAR_3
+        CALL PRINT_PIXEL
+        INC POSY
+        JMP BTN_REINICIAR_2
+    BTN_REINICIAR_3:
+        CMP POSX, 224
+        JE BTN_REINICIAR_4
+        CALL PRINT_PIXEL
+        DEC POSX
+        JMP BTN_REINICIAR_3
+    BTN_REINICIAR_4:
+        CMP POSY, 315
+        JE BTN_SALIR
+        CALL PRINT_PIXEL
+        DEC POSY
+        JMP BTN_REINICIAR_4
+    ;------------------------------------------
+    BTN_SALIR:
+        MOV POSX, 424
+        MOV POSY, 315
+        JMP BTN_SALIR_1
+
+    BTN_SALIR_1:
+        CMP POSX, 616
+        JE BTN_SALIR_2
+        CALL PRINT_PIXEL
+        INC POSX
+        JMP BTN_SALIR_1
+    BTN_SALIR_2:
+        CMP POSY, 342
+        JE BTN_SALIR_3
+        CALL PRINT_PIXEL
+        INC POSY
+        JMP BTN_SALIR_2
+    BTN_SALIR_3:
+        CMP POSX, 424
+        JE BTN_SALIR_4
+        CALL PRINT_PIXEL
+        DEC POSX
+        JMP BTN_SALIR_3
+    BTN_SALIR_4:
+        CMP POSY, 315
+        JE TERMINAR_BTNS
+        CALL PRINT_PIXEL
+        DEC POSY
+        JMP BTN_SALIR_4
+
+    TERMINAR_BTNS:
+        RET
+DIBUJAR_BTNS_GAME ENDP
+
+REINICIA_JUEGO PROC
+    CALL LIMPIAR_PANTALLA
+    CALL DIBUJAR_GUI
+
+    CMP FIN_PARTIDA, 1
+    JE REINICIO
+
+    MOV PUNTOS_JUGADOR2 , 0
+    MOV PUNTOS_JUGADOR1 , 0
+    MOV COLOR1_SELECCIONADO , 0
+    MOV COLOR2_SELECCIONADO , 0
+
+    REINICIO:
+
+    MOV CLICK_SUPERIOR_IZQUIERDA , 0
+    MOV CLICK_LADO_IZQUIERDO , 0
+    MOV CLICK_INFERIOR_IZQUIERDA , 0
+    MOV CLICK_SUPERIOR_DERECHA , 0
+    MOV CLICK_LADO_DERECHO , 0
+    MOV CLICK_INFERIOR_DERECHA , 0
+    MOV CLICK_LADO_SUPERIOR , 0
+    MOV CLICK_LADO_INFERIOR , 0
+    MOV CLICK_CENTRO , 0
+
+    MOV CLICK_GUARDAR , 0
+    MOV CLICK_REINICIAR , 0
+    MOV CLICK_SALIR , 0
+
+    MOV TURNO_JUGADOR , 0
+
+    MOV SUPERIOR_IZQUIERDA_PINTADO , 0
+    MOV LADO_IZQUIERDO_PINTADO , 0
+    MOV INFERIOR_IZQUIERDA_PINTADO , 0
+
+    MOV LADO_SUPERIOR_PINTADO , 0
+    MOV CENTRAL_PINTADO , 0
+    MOV LADO_INFERIOR_PINTADO , 0
+
+    MOV SUPERIOR_DERECHA_PINTADO , 0
+    MOV LADO_DERECHO_PINTADO , 0
+    MOV INFERIOR_DERECHA_PINTADO , 0
+
+    MOV CUADROS_PINTADOS , 0
+    MOV GANADOR , 0
+    MOV FIN_PARTIDA, 0
+
+    POS_CURSOR 1,3
+    MOV AH, 09H
+    LEA DX, PROMPT1
+    INT 21H
+
+    POS_CURSOR 1,53
+    MOV AH, 09H
+    LEA DX, PROMPT2
+    INT 21H
+
+    ;MOSTRAR CURSOR
+    MOV AX, 01H
+    INT 33H
+    RET
+REINICIA_JUEGO ENDP
+
+RELLENEAR_CUADRO_SUPERIOR_IZQUIERDA PROC
         MOV POSX, 20
         MOV POSY, 40
         MOV COLOR_LIMITE_ARRIBA, 40  
         MOV COLOR_LIMITE_ABAJO, 124
-
-        JMP DIBUJAR_COLOR_CICLO
-
-        DIBUJAR_COLOR_CICLO: 
-            MOV COLOR_PIXEL, 07H
-            JMP DIBUJAR_COLOR
-
-            TERMINAR_DIBUJO:
-                JMP TERMINAR_RELLENO
+        MOV COLOR_PIXEL, 07H
             
-            DIBUJAR_COLOR: 
-                MOV DX, COLOR_LIMITE_ABAJO
-                ADD DX, 1
-                CMP POSY, DX
-                JE DIBUJAR_SIGUIENTE_COLOR_INRANGE
-                MOV DX, COLOR_LIMITE_ARRIBA
-                CMP POSY, DX
-                JE COLOR_BORDE
-                MOV DX, COLOR_LIMITE_ABAJO
-                CMP POSY, DX
-                JE COLOR_BORDE
-                CMP POSX, 20
-                JE COLOR_BORDE
-                CMP POSX, 220
-                JE COLOR_BORDE
-                JMP RELLENO_COLOR_1
+        DIBUJAR_SUP_IZQ: 
+            MOV DX, COLOR_LIMITE_ABAJO
+            ADD DX, 1
+            CMP POSY, DX
+            JE TERMINAR_RELLENO_SUP_IZQ
+            MOV DX, COLOR_LIMITE_ARRIBA
+            CMP POSY, DX
+            JE BORDE_SUP_IZQ
+            MOV DX, COLOR_LIMITE_ABAJO
+            CMP POSY, DX
+            JE BORDE_SUP_IZQ
+            CMP POSX, 20
+            JE BORDE_SUP_IZQ
+            CMP POSX, 220
+            JE BORDE_SUP_IZQ
+            JMP RELLENO_SUP_IZQ
 
-                DIBUJAR_SIGUIENTE_COLOR_INRANGE:
-                    JMP DIBUJAR_SIGUIENTE_COLOR
+            BORDE_SUP_IZQ:
+                MOV COLOR_PIXEL, 07H
+                CALL PRINT_PIXEL
+                INC POSX
+                CMP POSX, 221
+                JE SIGUIENTE_SUP_IZQ
+                JMP DIBUJAR_SUP_IZQ
+                
+                SIGUIENTE_SUP_IZQ:
+                    MOV POSX, 20
+                    ADD POSY, 1
+                    JMP DIBUJAR_SUP_IZQ
 
-                COLOR_BORDE:
+                RELLENO_SUP_IZQ:
+                    CMP TURNO_JUGADOR, 0
+                    JE JUG_1_SUP_IZQ
+                    JMP JUG_2_SUP_IZQ
+                JUG_1_SUP_IZQ:
+                    MOV DH, COLOR_JUGADOR1
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_SUP_IZQ
+                JUG_2_SUP_IZQ:
+                    MOV DH, COLOR_JUGADOR2
+                    MOV COLOR_RELLENO, DH
+                    
+                    JMP CONTINUA_RELLENO_SUP_IZQ
+                CONTINUA_RELLENO_SUP_IZQ:
+                    MOV DH, COLOR_RELLENO
+                    MOV COLOR_PIXEL, DH
+                    JMP APLICAR_RELLENADO_SUP_IZQ
+
+                APLICAR_RELLENADO_SUP_IZQ:
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    JMP DIBUJAR_SUP_IZQ
+
+        TERMINAR_RELLENO_SUP_IZQ:
+            CMP TURNO_JUGADOR, 0
+            JE TURNO_JUG_1_SUP_IZQ
+            JMP TURNO_JUG_2_SUP_IZQ
+
+        TURNO_JUG_1_SUP_IZQ:
+            INC TURNO_JUGADOR
+            MOV SUPERIOR_IZQUIERDA_PINTADO, 1
+            JMP FIN_RELLENO_SUP_IZQ
+        TURNO_JUG_2_SUP_IZQ:
+            DEC TURNO_JUGADOR
+            MOV SUPERIOR_IZQUIERDA_PINTADO, 2
+            JMP FIN_RELLENO_SUP_IZQ
+        FIN_RELLENO_SUP_IZQ:
+        MOV COLOR_PIXEL, 01H
+        RET
+RELLENEAR_CUADRO_SUPERIOR_IZQUIERDA ENDP
+
+RELLENEAR_CUADRO_LADO_IZQUIERDO PROC
+        
+        MOV POSX, 20
+        MOV POSY, 124
+        MOV COLOR_LIMITE_ARRIBA, 124  
+        MOV COLOR_LIMITE_ABAJO, 208
+        MOV COLOR_PIXEL, 07H
+    
+        DIBUJAR_LAD_IZQ: 
+            MOV DX, COLOR_LIMITE_ABAJO
+            ADD DX, 1
+            CMP POSY, DX
+            JE TERMINAR_RELLENO_LAD_IZQ
+            MOV DX, COLOR_LIMITE_ARRIBA
+            CMP POSY, DX
+            JE BORDE_LAD_IZQ
+            MOV DX, COLOR_LIMITE_ABAJO
+            CMP POSY, DX
+            JE BORDE_LAD_IZQ
+            CMP POSX, 20
+            JE BORDE_LAD_IZQ
+            CMP POSX, 220
+            JE BORDE_LAD_IZQ
+            JMP RELLENO_LAD_IZQ
+
+                BORDE_LAD_IZQ:
                     MOV COLOR_PIXEL, 07H
                     CALL PRINT_PIXEL
                     INC POSX
                     CMP POSX, 221
-                    JE SIGUIENTE_LINEA_RELLENO
-                    JMP DIBUJAR_COLOR
-                    
-                    SIGUIENTE_LINEA_RELLENO:
-                        MOV POSX, 20
-                        ADD POSY, 1
-                        JMP DIBUJAR_COLOR
+                    JE SIGUIENTE_LAD_IZQ
+                    JMP DIBUJAR_LAD_IZQ
+                
+                SIGUIENTE_LAD_IZQ:
+                    MOV POSX, 20
+                    ADD POSY, 1
+                    JMP DIBUJAR_LAD_IZQ
 
-                    RELLENO_COLOR_1:
-                       MOV DH, CL_ROJO
-                        MOV COLOR_PIXEL, DH
-                        JMP APLICAR_RELLENADO
+                RELLENO_LAD_IZQ:
+                    CMP TURNO_JUGADOR, 0
+                    JE JUG_1_LAD_IZQ
+                    JMP JUG_2_LAD_IZQ
+                JUG_1_LAD_IZQ:
+                    MOV DH, COLOR_JUGADOR1
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_LAD_IZQ
+                JUG_2_LAD_IZQ:
+                    MOV DH, COLOR_JUGADOR2
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_LAD_IZQ
+                CONTINUA_RELLENO_LAD_IZQ:
+                    MOV DH, COLOR_RELLENO
+                    MOV COLOR_PIXEL, DH
+                    JMP APLICAR_RELLENADO_LAD_IZQ
 
-                    APLICAR_RELLENADO:
-                        CALL PRINT_PIXEL
-                        INC POSX
-                        JMP DIBUJAR_COLOR
+                APLICAR_RELLENADO_LAD_IZQ:
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    JMP DIBUJAR_LAD_IZQ
 
-            DIBUJAR_SIGUIENTE_COLOR:
-                JMP TERMINAR_RELLENO
-    TERMINAR_RELLENO: 
+        TERMINAR_RELLENO_LAD_IZQ:
+            CMP TURNO_JUGADOR, 0
+            JE TURNO_JUG_1_LAD_IZQ
+            JMP TURNO_JUG_2_LAD_IZQ
+        TURNO_JUG_1_LAD_IZQ:
+            INC TURNO_JUGADOR
+            MOV LADO_IZQUIERDO_PINTADO, 1
+            JMP FIN_RELLENO_LAD_IZQ
+        TURNO_JUG_2_LAD_IZQ:
+            DEC TURNO_JUGADOR
+            MOV LADO_IZQUIERDO_PINTADO, 2
+        FIN_RELLENO_LAD_IZQ:
         MOV COLOR_PIXEL, 01H
         RET
-RELLENEAR_CUADRO ENDP
+RELLENEAR_CUADRO_LADO_IZQUIERDO ENDP
+
+RELLENEAR_CUADRO_INFERIOR_IZQUIERDO PROC
+        
+        MOV POSX, 20    ;INI
+        MOV POSY, 208 ;INI
+        MOV COLOR_LIMITE_ARRIBA, 208  ;INI Y
+        MOV COLOR_LIMITE_ABAJO, 292; 2
+        MOV COLOR_PIXEL, 07H
+    
+        DIBUJAR_INF_IZQ: 
+            MOV DX, COLOR_LIMITE_ABAJO
+            ADD DX, 1
+            CMP POSY, DX
+            JE TERMINAR_RELLENO_INF_IZQ
+            MOV DX, COLOR_LIMITE_ARRIBA
+            CMP POSY, DX
+            JE BORDE_INF_IZQ
+            MOV DX, COLOR_LIMITE_ABAJO
+            CMP POSY, DX
+            JE BORDE_INF_IZQ
+            CMP POSX, 20 ;3
+            JE BORDE_INF_IZQ
+            CMP POSX, 220;1
+            JE BORDE_INF_IZQ
+            JMP RELLENO_INF_IZQ
+
+                BORDE_INF_IZQ:
+                    MOV COLOR_PIXEL, 07H
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    CMP POSX, 221;1
+                    JE SIGUIENTE_INF_IZQ
+                    JMP DIBUJAR_INF_IZQ
+                
+                SIGUIENTE_INF_IZQ:
+                    MOV POSX, 20
+                    ADD POSY, 1
+                    JMP DIBUJAR_INF_IZQ
+
+                RELLENO_INF_IZQ:
+                    CMP TURNO_JUGADOR, 0
+                    JE JUG_1_INF_IZQ
+                    JMP JUG_2_INF_IZQ
+                JUG_1_INF_IZQ:
+                    MOV DH, COLOR_JUGADOR1
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_INF_IZQ
+                JUG_2_INF_IZQ:
+                    MOV DH, COLOR_JUGADOR2
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_INF_IZQ
+                CONTINUA_RELLENO_INF_IZQ:
+                    MOV DH, COLOR_RELLENO
+                    MOV COLOR_PIXEL, DH
+                    JMP APLICAR_RELLENADO_INF_IZQ
+
+                APLICAR_RELLENADO_INF_IZQ:
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    JMP DIBUJAR_INF_IZQ
+
+        TERMINAR_RELLENO_INF_IZQ:
+            CMP TURNO_JUGADOR, 0
+            JE TURNO_JUG_1_INF_IZQ
+            JMP TURNO_JUG_2_INF_IZQ
+        TURNO_JUG_1_INF_IZQ:
+            INC TURNO_JUGADOR
+            MOV INFERIOR_IZQUIERDA_PINTADO, 1
+            JMP FIN_RELLENO_LAD_IZQ
+        TURNO_JUG_2_INF_IZQ:
+            DEC TURNO_JUGADOR
+            MOV INFERIOR_IZQUIERDA_PINTADO, 2
+        FIN_RELLENO_INF_IZQ:
+        MOV COLOR_PIXEL, 01H
+        RET
+RELLENEAR_CUADRO_INFERIOR_IZQUIERDO ENDP
+
+RELLENEAR_CUADRO_LADO_SUPERIOR PROC
+        
+        MOV POSX, 220    ;INI
+        MOV POSY, 40 ;INI
+        MOV COLOR_LIMITE_ARRIBA, 40  ;INI Y
+        MOV COLOR_LIMITE_ABAJO, 124; 2
+        MOV COLOR_PIXEL, 07H
+    
+        DIBUJAR_LAD_SUP: 
+            MOV DX, COLOR_LIMITE_ABAJO
+            ADD DX, 1
+            CMP POSY, DX
+            JE TERMINAR_RELLENO_LAD_SUP
+            MOV DX, COLOR_LIMITE_ARRIBA
+            CMP POSY, DX
+            JE BORDE_LAD_SUP
+            MOV DX, COLOR_LIMITE_ABAJO
+            CMP POSY, DX
+            JE BORDE_LAD_SUP
+            CMP POSX, 220 ;3
+            JE BORDE_LAD_SUP
+            CMP POSX, 420;1
+            JE BORDE_LAD_SUP
+            JMP RELLENO_LAD_SUP
+
+                BORDE_LAD_SUP:
+                    MOV COLOR_PIXEL, 07H
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    CMP POSX, 421;1
+                    JE SIGUIENTE_LAD_SUP
+                    JMP DIBUJAR_LAD_SUP
+                
+                SIGUIENTE_LAD_SUP:
+                    MOV POSX, 220;INI X
+                    ADD POSY, 1
+                    JMP DIBUJAR_LAD_SUP
+
+                RELLENO_LAD_SUP:
+                    CMP TURNO_JUGADOR, 0
+                    JE JUG_1_LAD_SUP
+                    JMP JUG_2_LAD_SUP
+                JUG_1_LAD_SUP:
+                    MOV DH, COLOR_JUGADOR1
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_LAD_SUP
+                JUG_2_LAD_SUP:
+                    MOV DH, COLOR_JUGADOR2
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_LAD_SUP
+                CONTINUA_RELLENO_LAD_SUP:
+                    MOV DH, COLOR_RELLENO
+                    MOV COLOR_PIXEL, DH
+                    JMP APLICAR_RELLENADO_LAD_SUP
+
+                APLICAR_RELLENADO_LAD_SUP:
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    JMP DIBUJAR_LAD_SUP
+                    
+        TERMINAR_RELLENO_LAD_SUP:
+            CMP TURNO_JUGADOR, 0
+            JE TURNO_JUG_1_LAD_SUP
+            JMP TURNO_JUG_2_LAD_SUP
+        TURNO_JUG_1_LAD_SUP:
+            INC TURNO_JUGADOR
+            MOV LADO_SUPERIOR_PINTADO, 1         
+            JMP FIN_RELLENO_LAD_IZQ
+        TURNO_JUG_2_LAD_SUP:
+            DEC TURNO_JUGADOR
+            MOV LADO_SUPERIOR_PINTADO, 2
+        FIN_RELLENO_LAD_SUP:
+        MOV COLOR_PIXEL, 01H
+        RET
+RELLENEAR_CUADRO_LADO_SUPERIOR ENDP
+
+RELLENEAR_CUADRO_CENTRAL PROC
+        
+        MOV POSX, 220    ;INI
+        MOV POSY, 124 ;INI
+        MOV COLOR_LIMITE_ARRIBA, 124  ;INI Y
+        MOV COLOR_LIMITE_ABAJO, 208; 2
+        MOV COLOR_PIXEL, 07H
+    
+        DIBUJAR_CENTRAL: 
+            MOV DX, COLOR_LIMITE_ABAJO
+            ADD DX, 1
+            CMP POSY, DX
+            JE TERMINAR_RELLENO_CENTRAL
+            MOV DX, COLOR_LIMITE_ARRIBA
+            CMP POSY, DX
+            JE BORDE_CENTRAL
+            MOV DX, COLOR_LIMITE_ABAJO
+            CMP POSY, DX
+            JE BORDE_CENTRAL
+            CMP POSX, 220 ;3
+            JE BORDE_CENTRAL
+            CMP POSX, 420;1
+            JE BORDE_CENTRAL
+            JMP RELLENO_CENTRAL
+
+                BORDE_CENTRAL:
+                    MOV COLOR_PIXEL, 07H
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    CMP POSX, 421;1
+                    JE SIGUIENTE_CENTRAL
+                    JMP DIBUJAR_CENTRAL
+                
+                SIGUIENTE_CENTRAL:
+                    MOV POSX, 220;INI X
+                    ADD POSY, 1
+                    JMP DIBUJAR_CENTRAL
+
+                RELLENO_CENTRAL:
+                    CMP TURNO_JUGADOR, 0
+                    JE JUG_1_CENTRAL
+                    JMP JUG_2_CENTRAL
+                JUG_1_CENTRAL:
+                    MOV DH, COLOR_JUGADOR1
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_CENTRAL
+                JUG_2_CENTRAL:
+                    MOV DH, COLOR_JUGADOR2
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_CENTRAL
+                CONTINUA_RELLENO_CENTRAL:
+                    MOV DH, COLOR_RELLENO
+                    MOV COLOR_PIXEL, DH
+                    JMP APLICAR_RELLENADO_CENTRAL
+
+                APLICAR_RELLENADO_CENTRAL:
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    JMP DIBUJAR_CENTRAL
+                    
+        TERMINAR_RELLENO_CENTRAL:
+            CMP TURNO_JUGADOR, 0
+            JE TURNO_JUG_1_CENTRAL
+            JMP TURNO_JUG_2_CENTRAL
+        TURNO_JUG_1_CENTRAL:
+            INC TURNO_JUGADOR
+            MOV CENTRAL_PINTADO, 1         
+            JMP FIN_RELLENO_LAD_IZQ
+        TURNO_JUG_2_CENTRAL:
+            DEC TURNO_JUGADOR
+            MOV CENTRAL_PINTADO, 2
+        FIN_RELLENO_CENTRAL:
+        MOV COLOR_PIXEL, 01H
+        RET
+RELLENEAR_CUADRO_CENTRAL ENDP
+
+RELLENEAR_CUADRO_LADO_INFERIOR PROC
+        
+        MOV POSX, 220    ;INI
+        MOV POSY, 208 ;INI
+        MOV COLOR_LIMITE_ARRIBA, 208  ;INI Y
+        MOV COLOR_LIMITE_ABAJO, 292; 2
+        MOV COLOR_PIXEL, 07H
+    
+        DIBUJAR_LAD_INF: 
+            MOV DX, COLOR_LIMITE_ABAJO
+            ADD DX, 1
+            CMP POSY, DX
+            JE TERMINAR_RELLENO_LAD_INF
+            MOV DX, COLOR_LIMITE_ARRIBA
+            CMP POSY, DX
+            JE BORDE_LAD_INF
+            MOV DX, COLOR_LIMITE_ABAJO
+            CMP POSY, DX
+            JE BORDE_LAD_INF
+            CMP POSX, 220 ;3
+            JE BORDE_LAD_INF
+            CMP POSX, 420;1
+            JE BORDE_LAD_INF
+            JMP RELLENO_LAD_INF
+
+                BORDE_LAD_INF:
+                    MOV COLOR_PIXEL, 07H
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    CMP POSX, 421;1
+                    JE SIGUIENTE_LAD_INF
+                    JMP DIBUJAR_LAD_INF
+                
+                SIGUIENTE_LAD_INF:
+                    MOV POSX, 220;INI X
+                    ADD POSY, 1
+                    JMP DIBUJAR_LAD_INF
+
+                RELLENO_LAD_INF:
+                    CMP TURNO_JUGADOR, 0
+                    JE JUG_1_LAD_INF
+                    JMP JUG_2_LAD_INF
+                JUG_1_LAD_INF:
+                    MOV DH, COLOR_JUGADOR1
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_LAD_INF
+                JUG_2_LAD_INF:
+                    MOV DH, COLOR_JUGADOR2
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_LAD_INF
+                CONTINUA_RELLENO_LAD_INF:
+                    MOV DH, COLOR_RELLENO
+                    MOV COLOR_PIXEL, DH
+                    JMP APLICAR_RELLENADO_LAD_INF
+
+                APLICAR_RELLENADO_LAD_INF:
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    JMP DIBUJAR_LAD_INF
+                    
+        TERMINAR_RELLENO_LAD_INF:
+            CMP TURNO_JUGADOR, 0
+            JE TURNO_JUG_1_LAD_INF
+            JMP TURNO_JUG_2_LAD_INF
+        TURNO_JUG_1_LAD_INF:
+            INC TURNO_JUGADOR
+            MOV LADO_INFERIOR_PINTADO, 1         
+            JMP FIN_RELLENO_LAD_IZQ
+        TURNO_JUG_2_LAD_INF:
+            DEC TURNO_JUGADOR
+            MOV LADO_INFERIOR_PINTADO, 2
+        FIN_RELLENO_LAD_INF:
+        MOV COLOR_PIXEL, 01H
+        RET
+RELLENEAR_CUADRO_LADO_INFERIOR ENDP
+
+RELLENEAR_CUADRO_SUPERIOR_DERECHA PROC
+        MOV POSX, 420    ;INI
+        MOV POSY, 40 ;INI
+        MOV COLOR_LIMITE_ARRIBA, 40  ;INI Y
+        MOV COLOR_LIMITE_ABAJO, 124; 2
+        MOV COLOR_PIXEL, 07H
+    
+        DIBUJAR_SUP_DER: 
+            MOV DX, COLOR_LIMITE_ABAJO
+            ADD DX, 1
+            CMP POSY, DX
+            JE TERMINAR_RELLENO_SUP_DER
+            MOV DX, COLOR_LIMITE_ARRIBA
+            CMP POSY, DX
+            JE BORDE_SUP_DER
+            MOV DX, COLOR_LIMITE_ABAJO
+            CMP POSY, DX
+            JE BORDE_SUP_DER
+            CMP POSX, 420 ;3
+            JE BORDE_SUP_DER
+            CMP POSX, 620;1
+            JE BORDE_SUP_DER
+            JMP RELLENO_SUP_DER
+
+                BORDE_SUP_DER:
+                    MOV COLOR_PIXEL, 07H
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    CMP POSX, 621;1
+                    JE SIGUIENTE_SUP_DER
+                    JMP DIBUJAR_SUP_DER
+                
+                SIGUIENTE_SUP_DER:
+                    MOV POSX, 420;INI X
+                    ADD POSY, 1
+                    JMP DIBUJAR_SUP_DER
+
+                RELLENO_SUP_DER:
+                    CMP TURNO_JUGADOR, 0
+                    JE JUG_1_SUP_DER
+                    JMP JUG_2_SUP_DER
+                JUG_1_SUP_DER:
+                    MOV DH, COLOR_JUGADOR1
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_SUP_DER
+                JUG_2_SUP_DER:
+                    MOV DH, COLOR_JUGADOR2
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_SUP_DER
+                CONTINUA_RELLENO_SUP_DER:
+                    MOV DH, COLOR_RELLENO
+                    MOV COLOR_PIXEL, DH
+                    JMP APLICAR_RELLENADO_SUP_DER
+
+                APLICAR_RELLENADO_SUP_DER:
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    JMP DIBUJAR_SUP_DER
+                    
+        TERMINAR_RELLENO_SUP_DER:
+            CMP TURNO_JUGADOR, 0
+            JE TURNO_JUG_1_SUP_DER
+            JMP TURNO_JUG_2_SUP_DER
+        TURNO_JUG_1_SUP_DER:
+            INC TURNO_JUGADOR
+            MOV SUPERIOR_DERECHA_PINTADO, 1         
+            JMP FIN_RELLENO_LAD_IZQ
+        TURNO_JUG_2_SUP_DER:
+            DEC TURNO_JUGADOR
+            MOV SUPERIOR_DERECHA_PINTADO, 2
+        FIN_RELLENO_SUP_DER:
+        MOV COLOR_PIXEL, 01H
+        RET
+RELLENEAR_CUADRO_SUPERIOR_DERECHA ENDP
+
+RELLENEAR_CUADRO_LADO_DERECHO PROC
+        MOV POSX, 420    ;INI
+        MOV POSY, 124 ;INI
+        MOV COLOR_LIMITE_ARRIBA, 124  ;INI Y
+        MOV COLOR_LIMITE_ABAJO, 208; 2
+        MOV COLOR_PIXEL, 07H
+    
+        DIBUJAR_LAD_DER: 
+            MOV DX, COLOR_LIMITE_ABAJO
+            ADD DX, 1
+            CMP POSY, DX
+            JE TERMINAR_RELLENO_LAD_DER
+            MOV DX, COLOR_LIMITE_ARRIBA
+            CMP POSY, DX
+            JE BORDE_LAD_DER
+            MOV DX, COLOR_LIMITE_ABAJO
+            CMP POSY, DX
+            JE BORDE_LAD_DER
+            CMP POSX, 420 ;3
+            JE BORDE_LAD_DER
+            CMP POSX, 620;1
+            JE BORDE_LAD_DER
+            JMP RELLENO_LAD_DER
+
+                BORDE_LAD_DER:
+                    MOV COLOR_PIXEL, 07H
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    CMP POSX, 621;1
+                    JE SIGUIENTE_LAD_DER
+                    JMP DIBUJAR_LAD_DER
+                
+                SIGUIENTE_LAD_DER:
+                    MOV POSX, 420;INI X
+                    ADD POSY, 1
+                    JMP DIBUJAR_LAD_DER
+
+                RELLENO_LAD_DER:
+                    CMP TURNO_JUGADOR, 0
+                    JE JUG_1_LAD_DER
+                    JMP JUG_2_LAD_DER
+                JUG_1_LAD_DER:
+                    MOV DH, COLOR_JUGADOR1
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_LAD_DER
+                JUG_2_LAD_DER:
+                    MOV DH, COLOR_JUGADOR2
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_LAD_DER
+                CONTINUA_RELLENO_LAD_DER:
+                    MOV DH, COLOR_RELLENO
+                    MOV COLOR_PIXEL, DH
+                    JMP APLICAR_RELLENADO_LAD_DER
+
+                APLICAR_RELLENADO_LAD_DER:
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    JMP DIBUJAR_LAD_DER
+                    
+        TERMINAR_RELLENO_LAD_DER:
+            CMP TURNO_JUGADOR, 0
+            JE TURNO_JUG_1_LAD_DER
+            JMP TURNO_JUG_2_LAD_DER
+        TURNO_JUG_1_LAD_DER:
+            INC TURNO_JUGADOR
+            MOV LADO_DERECHO_PINTADO, 1         
+            JMP FIN_RELLENO_LAD_IZQ
+        TURNO_JUG_2_LAD_DER:
+            DEC TURNO_JUGADOR
+            MOV LADO_DERECHO_PINTADO, 2
+        FIN_RELLENO_LAD_DER:
+        MOV COLOR_PIXEL, 01H
+        RET
+RELLENEAR_CUADRO_LADO_DERECHO ENDP
+
+RELLENEAR_CUADRO_INFERIOR_DERECHA PROC
+        MOV POSX, 420
+        MOV POSY, 208 
+        MOV COLOR_LIMITE_ARRIBA, 208 
+        MOV COLOR_LIMITE_ABAJO, 292;
+        MOV COLOR_PIXEL, 07H
+    
+        DIBUJAR_INF_DER: 
+            MOV DX, COLOR_LIMITE_ABAJO
+            ADD DX, 1
+            CMP POSY, DX
+            JE TERMINAR_RELLENO_INF_DER
+            MOV DX, COLOR_LIMITE_ARRIBA
+            CMP POSY, DX
+            JE BORDE_INF_DER
+            MOV DX, COLOR_LIMITE_ABAJO
+            CMP POSY, DX
+            JE BORDE_INF_DER
+            CMP POSX, 420 
+            JE BORDE_INF_DER
+            CMP POSX, 620
+            JE BORDE_INF_DER
+            JMP RELLENO_INF_DER
+
+                BORDE_INF_DER:
+                    MOV COLOR_PIXEL, 07H
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    CMP POSX, 621
+                    JE SIGUIENTE_INF_DER
+                    JMP DIBUJAR_INF_DER
+                
+                SIGUIENTE_INF_DER:
+                    MOV POSX, 420
+                    ADD POSY, 1
+                    JMP DIBUJAR_INF_DER
+
+                RELLENO_INF_DER:
+                    CMP TURNO_JUGADOR, 0
+                    JE JUG_1_INF_DER
+                    JMP JUG_2_INF_DER
+                JUG_1_INF_DER:
+                    MOV DH, COLOR_JUGADOR1
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_INF_DER
+                JUG_2_INF_DER:
+                    MOV DH, COLOR_JUGADOR2
+                    MOV COLOR_RELLENO, DH
+                    JMP CONTINUA_RELLENO_INF_DER
+                CONTINUA_RELLENO_INF_DER:
+                    MOV DH, COLOR_RELLENO
+                    MOV COLOR_PIXEL, DH
+                    JMP APLICAR_RELLENADO_INF_DER
+
+                APLICAR_RELLENADO_INF_DER:
+                    CALL PRINT_PIXEL
+                    INC POSX
+                    JMP DIBUJAR_INF_DER
+                    
+        TERMINAR_RELLENO_INF_DER:
+            CMP TURNO_JUGADOR, 0
+            JE TURNO_JUG_1_INF_DER
+            JMP TURNO_JUG_2_INF_DER
+        TURNO_JUG_1_INF_DER:
+            INC TURNO_JUGADOR
+            MOV INFERIOR_DERECHA_PINTADO, 1         
+            JMP FIN_RELLENO_LAD_IZQ
+        TURNO_JUG_2_INF_DER:
+            DEC TURNO_JUGADOR
+            MOV INFERIOR_DERECHA_PINTADO, 2
+        FIN_RELLENO_INF_DER:
+        MOV COLOR_PIXEL, 01H
+        RET
+RELLENEAR_CUADRO_INFERIOR_DERECHA ENDP
+
+DETERMINA_GANADOR PROC
+
+    CALL LIMPIAR_PANTALLA
+    MOV AX, 01H
+    INT 33H
+    POS_CURSOR 23,7 
+    MOV AH, 09H
+	LEA DX, MSG_GUARDAR
+	INT 21H
+    POS_CURSOR 23,32
+    MOV AH, 09H
+	LEA DX, MSG_REINICIAR
+	INT 21H
+    POS_CURSOR 23,59 
+    MOV AH, 09H
+	LEA DX, MSG_SALIR
+	INT 21H
+
+    CMP GANADOR, 1
+    JE HAY_GANADOR
+    JMP NO_GANADOR
+    HAY_GANADOR:
+        CMP TURNO_JUGADOR, 0
+        JE GANADOR_JUG2
+        CMP TURNO_JUGADOR, 1
+        JE GANADOR_JUG1
+
+    GANADOR_JUG1:
+        POS_CURSOR 10,30 
+        MOV AH, 09H
+        LEA DX, MSG_GANADOR1
+        INT 21H
+
+        ; POS_CURSOR 12,20
+        ; MOV AH, 09H
+        ; LEA DX, NAMEJUGA1
+        ; INT 21H
+
+        MOV AX, PUNTOS_JUGADOR1
+        ADD AX, 10
+        MOV PUNTOS_JUGADOR1 , AX
+
+        POS_CURSOR 14,20
+        MOV AH, 09H
+        LEA DX, PUNTOS_JUGADOR1
+        INT 21H
+    
+        CALL DIBUJAR_BTNS_GAME
+        RET
+
+    GANADOR_JUG2:
+        POS_CURSOR 10,30 
+        MOV AH, 09H
+        LEA DX, MSG_GANADOR2
+        INT 21H
+        CALL DIBUJAR_BTNS_GAME
+        RET
+    NO_GANADOR:
+        POS_CURSOR 10,30 
+        MOV AH, 09H
+        LEA DX, MSG_EMPATE
+        INT 21H
+        CALL DIBUJAR_BTNS_GAME
+        RET
+DETERMINA_GANADOR ENDP
+
+BUSCAR_GANADOR  PROC
+
+    HORIZONTAL1:
+        MOV DH, SUPERIOR_IZQUIERDA_PINTADO 
+        CMP DH, 0
+        JE HORIZONTAL2
+        MOV DH, LADO_SUPERIOR_PINTADO 
+        CMP DH, 0
+        JE HORIZONTAL2
+        MOV DH, SUPERIOR_DERECHA_PINTADO 
+        CMP DH, 0
+        JE HORIZONTAL2
+    
+
+        HORIZONTAL1_PT1:
+        MOV DH, SUPERIOR_IZQUIERDA_PINTADO 
+        CMP DH, LADO_SUPERIOR_PINTADO
+        JE HORIZONTAL1_PT2
+        JMP HORIZONTAL2
+
+        HORIZONTAL1_PT2:
+        MOV DH, LADO_SUPERIOR_PINTADO
+        CMP DH, SUPERIOR_DERECHA_PINTADO
+        JE HORIZONTAL1_PT3
+        JMP HORIZONTAL2
+
+        HORIZONTAL1_PT3:
+            MOV GANADOR, 1
+            RET
+
+    HORIZONTAL2:
+        MOV DH, LADO_IZQUIERDO_PINTADO 
+        CMP DH, 0
+        JE HORIZONTAL3
+        MOV DH, CENTRAL_PINTADO 
+        CMP DH, 0
+        JE HORIZONTAL3
+        MOV DH, LADO_DERECHO_PINTADO 
+        CMP DH, 0
+        JE HORIZONTAL3
+    
+
+        HORIZONTAL2_PT1:
+        MOV DH, LADO_IZQUIERDO_PINTADO 
+        CMP DH, CENTRAL_PINTADO
+        JE HORIZONTAL2_PT2
+        JMP HORIZONTAL3
+
+        HORIZONTAL2_PT2:
+        MOV DH, CENTRAL_PINTADO
+        CMP DH, LADO_DERECHO_PINTADO
+        JE HORIZONTAL2_PT3
+        JMP HORIZONTAL3
+
+        HORIZONTAL2_PT3:
+            MOV GANADOR, 1
+            RET
+
+    HORIZONTAL3:
+        MOV DH, INFERIOR_IZQUIERDA_PINTADO 
+        CMP DH, 0
+        JE VERTICAL1
+        MOV DH, LADO_INFERIOR_PINTADO 
+        CMP DH, 0
+        JE VERTICAL1
+        MOV DH, INFERIOR_DERECHA_PINTADO 
+        CMP DH, 0
+        JE VERTICAL1
+    
+
+        HORIZONTAL3_PT1:
+        MOV DH, INFERIOR_IZQUIERDA_PINTADO 
+        CMP DH, LADO_INFERIOR_PINTADO
+        JE HORIZONTAL3_PT2
+        JMP VERTICAL1
+
+        HORIZONTAL3_PT2:
+        MOV DH, LADO_INFERIOR_PINTADO
+        CMP DH, INFERIOR_DERECHA_PINTADO
+        JE HORIZONTAL3_PT3
+        JMP VERTICAL1
+
+        HORIZONTAL3_PT3:
+            MOV GANADOR, 1
+            RET
+    
+    VERTICAL1:
+        MOV DH, SUPERIOR_IZQUIERDA_PINTADO 
+        CMP DH, 0
+        JE VERTICAL2
+        MOV DH, LADO_IZQUIERDO_PINTADO 
+        CMP DH, 0
+        JE VERTICAL2
+        MOV DH, INFERIOR_IZQUIERDA_PINTADO 
+        CMP DH, 0
+        JE VERTICAL2
+    
+
+        VERTICAL1_PT1:
+        MOV DH, SUPERIOR_IZQUIERDA_PINTADO 
+        CMP DH, LADO_IZQUIERDO_PINTADO
+        JE VERTICAL1_PT2
+        JMP VERTICAL2
+
+        VERTICAL1_PT2:
+        MOV DH, LADO_IZQUIERDO_PINTADO
+        CMP DH, INFERIOR_IZQUIERDA_PINTADO
+        JE VERTICAL1_PT3
+        JMP VERTICAL2
+
+        VERTICAL1_PT3:
+            MOV GANADOR, 1
+            RET
+
+    VERTICAL2:
+        MOV DH, LADO_SUPERIOR_PINTADO 
+        CMP DH, 0
+        JE VERTICAL3
+        MOV DH, CENTRAL_PINTADO 
+        CMP DH, 0
+        JE VERTICAL3
+        MOV DH, LADO_INFERIOR_PINTADO 
+        CMP DH, 0
+        JE VERTICAL3
+    
+
+        VERTICAL2_PT1:
+        MOV DH, LADO_SUPERIOR_PINTADO 
+        CMP DH, CENTRAL_PINTADO
+        JE VERTICAL2_PT2
+        JMP VERTICAL3
+
+        VERTICAL2_PT2:
+        MOV DH, CENTRAL_PINTADO
+        CMP DH, LADO_INFERIOR_PINTADO
+        JE VERTICAL2_PT3
+        JMP VERTICAL3
+
+        VERTICAL2_PT3:
+            MOV GANADOR, 1
+            RET
+        
+    VERTICAL3:
+        MOV DH, SUPERIOR_DERECHA_PINTADO 
+        CMP DH, 0
+        JE DIAGONAL1
+        MOV DH, LADO_DERECHO_PINTADO 
+        CMP DH, 0
+        JE DIAGONAL1
+        MOV DH, INFERIOR_DERECHA_PINTADO 
+        CMP DH, 0
+        JE DIAGONAL1
+    
+
+        VERTICAL3_PT1:
+        MOV DH, SUPERIOR_DERECHA_PINTADO 
+        CMP DH, LADO_DERECHO_PINTADO
+        JE VERTICAL3_PT2
+        JMP DIAGONAL1
+
+        VERTICAL3_PT2:
+        MOV DH, LADO_DERECHO_PINTADO
+        CMP DH, INFERIOR_DERECHA_PINTADO
+        JE VERTICAL3_PT3
+        JMP DIAGONAL1
+
+        VERTICAL3_PT3:
+            MOV GANADOR, 1
+            RET
+
+    DIAGONAL1:
+        MOV DH, SUPERIOR_IZQUIERDA_PINTADO 
+        CMP DH, 0
+        JE DIAGONAL2
+        MOV DH, CENTRAL_PINTADO 
+        CMP DH, 0
+        JE DIAGONAL2
+        MOV DH, INFERIOR_DERECHA_PINTADO 
+        CMP DH, 0
+        JE DIAGONAL2
+    
+
+        DIAGONAL1_PT1:
+        MOV DH, SUPERIOR_IZQUIERDA_PINTADO 
+        CMP DH, CENTRAL_PINTADO
+        JE DIAGONAL1_PT2
+        JMP DIAGONAL2
+
+        DIAGONAL1_PT2:
+        MOV DH, CENTRAL_PINTADO
+        CMP DH, INFERIOR_DERECHA_PINTADO
+        JE DIAGONAL1_PT3
+        JMP DIAGONAL2
+
+        DIAGONAL1_PT3:
+            MOV GANADOR, 1
+            RET
+
+    DIAGONAL2:
+        MOV DH, INFERIOR_IZQUIERDA_PINTADO 
+        CMP DH, 0
+        JE FIN_BUSCAR_GANADOR
+        MOV DH, CENTRAL_PINTADO 
+        CMP DH, 0
+        JE FIN_BUSCAR_GANADOR
+        MOV DH, SUPERIOR_DERECHA_PINTADO 
+        CMP DH, 0
+        JE FIN_BUSCAR_GANADOR
+    
+
+        DIAGONAL2_PT1:
+        MOV DH, INFERIOR_IZQUIERDA_PINTADO 
+        CMP DH, CENTRAL_PINTADO
+        JE DIAGONAL2_PT2
+        JMP FIN_BUSCAR_GANADOR
+
+        DIAGONAL2_PT2:
+        MOV DH, CENTRAL_PINTADO
+        CMP DH, SUPERIOR_DERECHA_PINTADO
+        JE DIAGONAL2_PT3
+        JMP FIN_BUSCAR_GANADOR
+
+        DIAGONAL2_PT3:
+            MOV GANADOR, 1
+            RET
+    
+    FIN_BUSCAR_GANADOR:
+        RET
+BUSCAR_GANADOR ENDP
 
 PRINT_PIXEL PROC
     MOV AH, 0CH                     ; PARA IMPRIMIR UN PIXEL EN PANTALLA GRAFICA
@@ -766,11 +2037,9 @@ LIMPIAR_PANTALLA PROC
     MOV BH, 00
     MOV BL, 08
     INT 10H
-    
+
     RET
 LIMPIAR_PANTALLA ENDP
-
-
 
 MENU_INICIAL PROC
     POS_CURSOR 10,38 
@@ -859,10 +2128,10 @@ MENU_INICIAL PROC
 MENU_INICIAL ENDP
     
 DETECTAR_CLICK_MENU PROC
-    MOV AX, 03H                 ; PARA DETECTAR CUANDO SE SUELTA EL CLICK
-    INT 33h                     ; SE LLAMA LA INTERRUPCION DEL MOUSE     
-    CMP BX, 1                   ; LA INTERRUPCION DEVUELVE EN BX LA CANTIDAD DE VECES QUE SE SOLTO, ENTONCES COMPARO CON 1
-    JE COMPARAR_COORDENADAS_MENU     ; SI SE PRESIONO AL MENOS UNA VEZ, SALTA A CLICK_IZQUIERDO
+    MOV AX, 03H                     ; PARA DETECTAR CUANDO SE SUELTA EL CLICK
+    INT 33h                         ; SE LLAMA LA INTERRUPCION DEL MOUSE     
+    CMP BX, 1                       ; LA INTERRUPCION DEVUELVE EN BX LA CANTIDAD DE VECES QUE SE SOLTO, ENTONCES COMPARO CON 1
+    JE COMPARAR_COORDENADAS_MENU    ; SI SE PRESIONO AL MENOS UNA VEZ, SALTA A CLICK_IZQUIERDO
     JNE DETECTAR_CLICK_MENU
 
     COMPARAR_COORDENADAS_MENU:
@@ -879,6 +2148,88 @@ DETECTAR_CLICK_MENU PROC
     TERMINA_CLICK_MENU:
         RET
 DETECTAR_CLICK_MENU ENDP
+
+DETECTAR_TECLAS PROC
+
+    POS_CURSOR 10,12 
+    MOV AH, 09H
+	LEA DX, MSG_COLOR1
+	INT 21H
+
+    POS_CURSOR 13,13
+    MOV AH, 09H
+	LEA DX, MSG_COLOR2
+	INT 21H
+
+    POS_CURSOR 5,13
+    MOV AH, 09H
+	LEA DX, MSG_INSTRUCCIONES_COLOR
+	INT 21H
+
+    DETECTAR_TECLAS1:
+        CMP COLOR1_SELECCIONADO, 1
+        JE SELEC1
+        JMP DETECCION_TECLAS_MENU
+        SELEC1:
+            CMP COLOR2_SELECCIONADO, 1
+            JE FIN_DETECCION_TECLAS
+            JMP DETECCION_TECLAS_MENU
+
+    FIN_DETECCION_TECLAS:
+        CALL LIMPIAR_PANTALLA
+        MOV AX, 01H ;MOSTRAR CURSOR
+        INT 33H
+        RET
+
+    DETECCION_TECLAS_MENU:
+        MOV AH, 00H
+        INT 16H
+        CMP AH, 02 ; TECLA 1
+        JE JUG1_ROJO
+        CMP AH, 03 ; TECLA 2
+        JE JUG1_AMARILLO
+        CMP AH, 04 ; TECLA 3
+        JE JUG1_BLANCO
+        CMP AH, 05 ; TECLA 4
+        JE JUG2_ROSADO
+        CMP AH, 06 ; TECLA 5
+        JE JUG2_AZUL
+        CMP AH, 07 ; TECLA 6
+        JE JUG2_VERDE
+
+        JMP DETECTAR_TECLAS1
+
+    JUG1_ROJO:
+        MOV DH, 04H
+        MOV COLOR_JUGADOR1, DH
+        MOV COLOR1_SELECCIONADO, 1
+        JMP DETECTAR_TECLAS1
+    JUG1_AMARILLO:
+        MOV DH, 0EH
+        MOV COLOR_JUGADOR1, DH
+        MOV COLOR1_SELECCIONADO, 1
+        JMP DETECTAR_TECLAS1
+    JUG1_BLANCO:
+        MOV DH, 0FH
+        MOV COLOR_JUGADOR1, DH
+        MOV COLOR1_SELECCIONADO, 1
+        JMP DETECTAR_TECLAS1
+    JUG2_ROSADO:
+        MOV DH, 0DH
+        MOV COLOR_JUGADOR2, DH
+        MOV COLOR2_SELECCIONADO, 1
+        JMP DETECTAR_TECLAS1
+    JUG2_AZUL:
+        MOV DH, 01H
+        MOV COLOR_JUGADOR2, DH
+        MOV COLOR2_SELECCIONADO, 1
+        JMP DETECTAR_TECLAS1
+    JUG2_VERDE:
+        MOV DH, 0AH
+        MOV COLOR_JUGADOR2, DH
+        MOV COLOR2_SELECCIONADO, 1
+        JMP DETECTAR_TECLAS1
+DETECTAR_TECLAS ENDP
 
 COORDENADAS_JUGAR PROC
     MOV CLICK_JUGAR, 1
@@ -913,6 +2264,95 @@ COORDENADAS_CARGAR PROC
         MOV CLICK_CARGAR, 0
         RET
 COORDENADAS_CARGAR ENDP
+
+IMPRIMIRNOMBRE PROC NEAR
+    ;IMPRIMIR------------------------
+    MOV AH, 09H
+    LEA DX, NAMEFLD1
+    INT 21H
+    RET
+IMPRIMIRNOMBRE ENDP
+Q20CURS PROC NEAR
+    MOV AH, 02H
+    MOV BH, 00
+    INT 10H
+    
+    RET
+Q20CURS ENDP   
+
+R10PRMP1 PROC NEAR
+    MOV AH,09H
+    LEA DX,PROMPT1
+    INT 21H
+    RET 
+R10PRMP1 ENDP
+
+R10PRMP2 PROC NEAR
+    MOV AH,09H
+    LEA DX,PROMPT2
+    INT 21H
+    RET 
+R10PRMP2 ENDP
+
+D10INPT PROC NEAR
+    MOV AH,0AH
+    LEA DX,NAMEPAR
+    INT 21H
+    RET 
+D10INPT ENDP
+
+SAVENAME1 PROC NEAR
+    CLD
+    MOV CX, 21
+    LEA SI, NAMEFLD1
+    LEA DI, NAMEJUGA1
+    
+A20:
+    LODSB
+    MOV [DI], AL
+    INC DI
+    LOOP A20
+    RET
+SAVENAME1 ENDP
+
+SAVENAME2 PROC NEAR
+    CLD
+    MOV CX, 21
+    LEA SI, NAMEFLD1
+    LEA DI, NAMEJUGA2
+    
+B20:
+    LODSB
+    MOV [DI], AL
+    INC DI
+    LOOP A20
+    RET
+SAVENAME2 ENDP
+
+OBTENER_NOMBRE PROC NEAR
+
+    POS_CURSOR 1,3
+
+    CALL Q20CURS
+
+    CALL R10PRMP1
+
+    CALL D10INPT
+
+    CALL SAVENAME1
+
+    POS_CURSOR 1,53
+
+    CALL Q20CURS
+
+    CALL R10PRMP2
+
+    CALL D10INPT
+
+    CALL SAVENAME2
+
+    RET
+OBTENER_NOMBRE ENDP
 
 TERMINAR_PROGRAMA PROC
     CALL LIMPIAR_PANTALLA
